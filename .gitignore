@@ -1,0 +1,29 @@
+/data/*
+/__pycache__/*
+**.DS_Store
+**.png
+**.pdf
+**.h5
+
+# datainfo2/init_data
+datainfo2/init_data/ComboDrugData.csv
+
+# datainfo/mid_data/
+datainfo2/mid_data/DeepLearningInput.txt
+datainfo2/mid_data/MidDeepLearningInput.txt
+datainfo2/mid_data/FinalDeepLearningInput.txt
+datainfo2/mid_data/nci60-ccle_RNAseq_tpm2.csv
+
+# datainfo2/filtered_data/
+datainfo2/filtered_data/*.npy
+datainfo2/filtered_data/nci60-ccle_RNAseq_tpm2.csv
+datainfo2/filtered_data/ZeroFinalDeepLearningInput.txt
+
+# datainfo2/post_data/
+datainfo2/post_data/
+
+# datainfo2/result/
+datainfo2/result/
+
+# datainfo2/plot
+datainfo2/plot
