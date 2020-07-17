@@ -1,5 +1,5 @@
 # DeepSiganlingSynergy
-# # Drug Combo Predictions on Non-Fully Connected DNN
+## Drug Combo Predictions on Non-Fully Connected DNN
 
 * Get Information About How Many Lines Of Code
 ```
