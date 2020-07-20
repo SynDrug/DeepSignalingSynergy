@@ -111,7 +111,7 @@ class Analyse():
         plt.bar(range(len(top_gene_name_value_dict)), list(top_gene_name_value_dict.values()))
         plt.xticks(range(len(top_gene_name_value_dict)), list(top_gene_name_value_dict.keys()),
                     rotation = 30, fontsize = 10, ha = 'right')
-        plt.title('Top 50 Genes With Largest Absolute Importance Scores of 1648 Genes On Training Dataset',
+        plt.title('Top 50 Genes With Largest Absolute Importance Scores of 1684 Genes On Training Dataset',
                     fontsize = 16)
         plt.tight_layout()
         # SAVE TRAINING PLOT FIGURE
@@ -147,7 +147,7 @@ class Analyse():
         plt.bar(range(len(top_gene_name_value_dict)), list(top_gene_name_value_dict.values()))
         plt.xticks(range(len(top_gene_name_value_dict)), list(top_gene_name_value_dict.keys()),
                     rotation = 30, fontsize = 10, ha = 'right')
-        plt.title('Top 50 Genes With Largest Absolute Importance Scores of 1648 Genes On Test Dataset',
+        plt.title('Top 50 Genes With Largest Absolute Importance Scores of 1684 Genes On Validation Dataset',
                     fontsize = 16)
         plt.tight_layout()
         # SAVE TEST PLOT FIGURE
@@ -309,13 +309,13 @@ if __name__ == "__main__":
     post_data_path = '.' + dir_opt + '/post_data' # important may change xTe, xTr
 
 
-    # ANALYSE DRUG EFFECT
-    print('ANALYSING DRUG EFFECT...')
-    Analyse(dir_opt).plot_train_real_pred(path, epoch_time)
-    Analyse(dir_opt).plot_test_real_pred(path, epoch_time)
+    # # ANALYSE DRUG EFFECT
+    # print('ANALYSING DRUG EFFECT...')
+    # Analyse(dir_opt).plot_train_real_pred(path, epoch_time)
+    # Analyse(dir_opt).plot_test_real_pred(path, epoch_time)
 
     # ANALYSE GENES PATHWAYS
     print('ANALYSING PATHWAY GENE EFFECT...')
     Analyse(dir_opt).gene_analysis(RNA_seq_filename, pathway_filename, path, post_data_path, epoch_time)
-    Analyse(dir_opt).pathway_analysis(RNA_seq_filename, pathway_filename, path, post_data_path, epoch_time)
-    Analyse(dir_opt).gene_intersect(epoch_time)
+    # Analyse(dir_opt).pathway_analysis(RNA_seq_filename, pathway_filename, path, post_data_path, epoch_time)
+    # Analyse(dir_opt).gene_intersect(epoch_time)
