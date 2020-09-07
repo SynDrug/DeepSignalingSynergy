@@ -4,15 +4,21 @@ In this study, we proposed a not fully connected deep learning model, DeepSignal
 
 <!-- For more details of DeepSignalingSynergy, see our [bioRxiv paper]() -->
 
-### Environment Setting
+### Dependencies
 * python 3.7.3
 * tensorflow 1.13.1
 * pandas
 * sklearn
-* innvestigate
 
 ## 1.Data Preprocess
-We need to use pandas to parse files into a standard version of numpy files.
+This study intergrates following datasets
+* NCI ALMANAC drug combination screening dataset 
+* Gene expression data of NCI-60 Cancer Cell Lines
+* KEGG signaling pathways and cellular process
+* Drug-Target interactions from DrugBank database
+
+Finally, those datasets files will be parsed into numpy files to train our DeepSignalingSynergy model.
+
 ```
 python3 parse_file.py
 python3 load_data.py
