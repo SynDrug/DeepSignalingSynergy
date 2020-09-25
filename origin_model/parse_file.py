@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from numpy import savetxt
@@ -16,7 +17,7 @@ class ParseFile():
     # FIND THE DUPLICATE ROWS[Drug A, Drug B, Cell Line Name] THEN AVERAGE SCORE
     def input_condense(self):
         dir_opt = self.dir_opt
-        dl_input_df = pd.read_csv('.' + dir_opt + '/data/DeepLearningInput.csv')
+        dl_input_df = pd.read_csv('.' + dir_opt + '/init_data/DeepLearningInput.csv')
         dl_input_df = dl_input_df.groupby(['Drug A', 'Drug B', 'Cell Line Name']).agg({'Score':'mean'}).reset_index()
         dl_input_df.to_csv('.' + dir_opt + '/mid_data/DeepLearningInput.txt', index = False, header = True)
 
@@ -45,7 +46,6 @@ class ParseFile():
                 deletion_list.append(row[0])
         final_dl_input_df = mid_dl_input_df.drop(mid_dl_input_df.index[deletion_list]).reset_index(drop = True)
         final_dl_input_df.to_csv('.' + dir_opt + '/mid_data/FinalDeepLearningInput.txt', index = False, header = True)
-
     
     # REMOVE INPUT ROWS WITH ALL ZEROS ON DRUG TARGET GENE CONNECTION
     def input_drug_gene_condense(self, RNA_seq_filename):
@@ -80,14 +80,13 @@ class ParseFile():
             if all([a == 0 for a in drug_a_target_list]) or all([b == 0 for b in drug_b_target_list]): 
                 deletion_list.append(row[0])
         zero_final_dl_input_df = final_dl_input_df.drop(final_dl_input_df.index[deletion_list]).reset_index(drop = True)
-        zero_final_dl_input_df.to_csv('.' + dir_opt + '/mid_data/ZeroFinalDeepLearningInput.txt', index = False, header = True)
+        zero_final_dl_input_df.to_csv('.' + dir_opt + '/filtered_data/ZeroFinalDeepLearningInput.txt', index = False, header = True)
         print(zero_final_dl_input_df)
-
 
     # CALCULATE NUMBER OF UNIQUE DRUG IN ZEROFINAL_INPUT
     def zero_final_drug_count(self):
         dir_opt = self.dir_opt
-        zero_final_dl_input_df = pd.read_table('.' + dir_opt + '/mid_data/ZeroFinalDeepLearningInput.txt', delimiter = ',')
+        zero_final_dl_input_df = pd.read_table('.' + dir_opt + '/filtered_data/ZeroFinalDeepLearningInput.txt', delimiter = ',')
         zero_final_drug_list = []
         for drug in zero_final_dl_input_df['Drug A']:
             if drug not in zero_final_drug_list:
@@ -99,23 +98,41 @@ class ParseFile():
         print(zero_final_drug_list)
         print(len(zero_final_drug_list))
 
-    # SPLIT DEEP LEARNING INPUT INTO TRAINING AND TEST
-    def split_train_test(self, test_size):
+    # RANDOMIZE THE DL INPUT
+    def input_random_condense(self):
         dir_opt = self.dir_opt
-        zero_final_dl_input_df = pd.read_table('.' + dir_opt + '/mid_data/ZeroFinalDeepLearningInput.txt', delimiter = ',')
-        train_input_df, test_input_df = train_test_split(zero_final_dl_input_df, test_size = test_size)
-        train_input_df = train_input_df.reset_index(drop = True)
-        test_input_df = test_input_df.reset_index(drop = True)
+        zero_final_dl_input_df = pd.read_table('.' + dir_opt + '/filtered_data/ZeroFinalDeepLearningInput.txt', delimiter = ',')
+        random_final_dl_input_df = zero_final_dl_input_df.sample(frac = 1)
+        random_final_dl_input_df.to_csv('.' + dir_opt + '/filtered_data/RandomFinalDeepLearningInput.txt', index = False, header = True)
+        print(random_final_dl_input_df)
+
+    # # SPLIT DEEP LEARNING INPUT INTO TRAINING AND TEST
+    def split_k_fold(self, k, place_num):
+        dir_opt = self.dir_opt
+        dir_opt = self.dir_opt
+        random_final_dl_input_df = pd.read_table('.' + dir_opt + '/filtered_data/RandomFinalDeepLearningInput.txt', delimiter = ',')
+        print(random_final_dl_input_df)
+        num_points = random_final_dl_input_df.shape[0]
+
+        num_div = int(num_points / k)
+        num_div_list = [i * num_div for i in range(0, k)]
+        num_div_list.append(num_points)
+        low_idx = num_div_list[place_num - 1]
+        high_idx = num_div_list[place_num]
+        print('\n--------TRAIN-TEST SPLIT WITH TEST FROM ' + str(low_idx) + ' TO ' + str(high_idx) + '--------')
+        train_input_df = random_final_dl_input_df.drop(random_final_dl_input_df.index[low_idx : high_idx])
+        print(train_input_df)
+        test_input_df = random_final_dl_input_df[low_idx : high_idx]
+        print(test_input_df)
         train_input_df.to_csv('.' + dir_opt + '/filtered_data/TrainingInput.txt', index = False, header = True)
         test_input_df.to_csv('.' + dir_opt + '/filtered_data/TestInput.txt', index = False, header = True)
-        return train_input_df, test_input_df
 
 
     # FIND UNIQUE DRUG NAME FROM DATAFRAME AND MAP 
     def drug_map(self):
         dir_opt = self.dir_opt
-        dl_input_df = pd.read_table('.' + dir_opt + '/filtered_data/DeepLearningInput.txt', delimiter = ',')
-        drug_target_df = pd.read_table('.' + dir_opt + '/data/drug_tar_drugBank_all.txt')
+        dl_input_df = pd.read_table('.' + dir_opt + '/mid_data/DeepLearningInput.txt', delimiter = ',')
+        drug_target_df = pd.read_table('.' + dir_opt + '/init_data/drug_tar_drugBank_all.txt')
         drug_list = []
         for drug in dl_input_df['Drug A']:
             if drug not in drug_list:
@@ -125,17 +142,17 @@ class ParseFile():
                 drug_list.append(drug)
         drug_list = sorted(drug_list)
         drug_df = pd.DataFrame(data = drug_list, columns = ['Drug Name'])
-        drug_df.to_csv('.' + dir_opt + '/data/input_drug_name.txt', index = False, header = True)
+        drug_df.to_csv('.' + dir_opt + '/init_data/input_drug_name.txt', index = False, header = True)
         mapped_drug_list = []
         for drug in drug_target_df['Drug']:
             if drug not in mapped_drug_list:
                 mapped_drug_list.append(drug)
         mapped_drug_list = sorted(mapped_drug_list)
         mapped_drug_df = pd.DataFrame(data = mapped_drug_list, columns = ['Mapped Drug Name'])
-        mapped_drug_df.to_csv('.' + dir_opt + '/data/mapped_drug_name.txt', index = False, header = True)
+        mapped_drug_df.to_csv('.' + dir_opt + '/init_data/mapped_drug_name.txt', index = False, header = True)
         # LEFT JOIN TWO DATAFRAME
         drug_map_df = pd.merge(drug_df, mapped_drug_df, how='left', left_on = 'Drug Name', right_on = 'Mapped Drug Name')
-        drug_map_df.to_csv('.' + dir_opt + '/data/drug_map.csv', index = False, header = True)
+        drug_map_df.to_csv('.' + dir_opt + '/init_data/drug_map.csv', index = False, header = True)
         # AFTER AUTO MAP -> MANUAL MAP
     
     # FROM MANUAL MAP TO DRUG MAP DICT
@@ -145,13 +162,15 @@ class ParseFile():
         drug_map_dict = {}
         for row in drug_map_df.itertuples():
             drug_map_dict[row[1]] = row[2]
+        if os.path.exists('.' + dir_opt + '/filtered_data') == False:
+            os.mkdir('.' + dir_opt + '/filtered_data')
         np.save('.' + dir_opt + '/filtered_data/drug_map_dict.npy', drug_map_dict)
         return drug_map_dict
 
     # FORM ADAJACENT MATRIX (DRUG x TARGET) (LIST -> SORTED -> DICT -> MATRIX) (ALL 5435 DRUGS <-> ALL 2775 GENES)
     def drug_target(self):
         dir_opt = self.dir_opt
-        drug_target_df = pd.read_table('.' + dir_opt + '/data/drug_tar_drugBank_all.txt')
+        drug_target_df = pd.read_table('.' + dir_opt + '/init_data/drug_tar_drugBank_all.txt')
         # GET UNIQUE SORTED DRUGLIST AND TARGET(GENE) LIST
         drug_list = []
         for drug in drug_target_df['Drug']:
@@ -190,14 +209,24 @@ class ParseFile():
     # FROM MANUAL CELLLINE NAME MAP TO DICT
     def cellline_map_dict(self):
         dir_opt = self.dir_opt
-        cellline_name_df = pd.read_table('.' + dir_opt + '/mid_data/nci60-ccle_cell_name_map1.txt')
+        cellline_name_df = pd.read_table('.' + dir_opt + '/init_data/nci60-ccle_cell_name_map1.txt')
         cellline_map_dict = {}
         for row in cellline_name_df.itertuples():
             cellline_map_dict[row[1]] = row[2]
         np.save('.' + dir_opt + '/filtered_data/cellline_map_dict.npy', cellline_map_dict)
         return cellline_map_dict
 
-    # ]CCLE GENES : DRUG_TAR GENES]  KEY : VALUE
+    # FROM [CpNum] CELLLINE NAME MAP TO DICT
+    def cpnum_cellline_map_dict(self):
+        dir_opt = self.dir_opt
+        cpnum_cellline_name_df = pd.read_csv('.' + dir_opt + '/init_data/gdsc-ccle_cell_name_map2.csv')
+        cpnum_cellline_map_dict = {}
+        for row in cpnum_cellline_name_df.itertuples():
+            cpnum_cellline_map_dict[row[1]] = row[2]
+        np.save('.' + dir_opt + '/filtered_data/cpnum_cellline_map_dict.npy', cpnum_cellline_map_dict)
+        print(cpnum_cellline_map_dict)
+
+    # [CCLE GENES : DRUG_TAR GENES]  KEY : VALUE
     def gene_target_num_dict(self, RNA_seq_filename):
         dir_opt = self.dir_opt
         drug_dict, drug_num_dict, target_dict, target_num_dict = ParseFile(dir_opt).drug_target()
@@ -216,7 +245,7 @@ class ParseFile():
     # FILTER DUPLICATED AND SPARSE GENES (FINALLY [1130, 1684] GENES)
     def filter_cellline_gene(self, RNA_seq_filename):
         dir_opt = self.dir_opt
-        cellline_gene_df = pd.read_table('.' + dir_opt + '/data/' + RNA_seq_filename + '.txt')
+        cellline_gene_df = pd.read_table('.' + dir_opt + '/init_data/' + RNA_seq_filename + '.txt')
         cellline_gene_df = cellline_gene_df.drop_duplicates(subset = ['geneSymbol'], 
                     keep = 'first').sort_values(by = ['geneSymbol']).reset_index(drop = True)
         threshold = int((len(cellline_gene_df.columns) - 3) / 3)
@@ -232,7 +261,7 @@ class ParseFile():
     # FORM ADAJACENT MATRIX (GENE x PATHWAY) (LIST -> SORTED -> DICT -> MATRIX) (ALL 1298 GENES <-> 16 PATHWAYS)
     def gene_pathway(self, pathway_filename):
         dir_opt = self.dir_opt
-        gene_pathway_df = pd.read_table('.' + dir_opt + '/data/' + pathway_filename + '.txt')
+        gene_pathway_df = pd.read_table('.' + dir_opt + '/init_data/' + pathway_filename + '.txt')
         gene_list = sorted(list(gene_pathway_df['AllGenes']))
         gene_pathway_df = gene_pathway_df.drop(['AllGenes'], axis = 1).sort_index(axis = 1)
         pathway_list = list(gene_pathway_df.columns)
@@ -243,6 +272,7 @@ class ParseFile():
         pathway_num_dict = {i : pathway_list[i] for i in range(len(pathway_list))}
         # ITERATE THE DATAFRAME TO DEFINE CONNETIONS BETWEEN GENES AND PATHWAYS
         gene_pathway_matrix = np.zeros((len(gene_list), len(pathway_list))).astype(int)
+        print(gene_pathway_matrix.shape)
         for gene_row in gene_pathway_df.itertuples():
             pathway_index = 0
             for gene in gene_row[1:]:
@@ -255,50 +285,50 @@ class ParseFile():
         np.save('.' + dir_opt + '/filtered_data/pathway_dict.npy', pathway_dict)
         np.save('.' + dir_opt + '/filtered_data/pathway_num_dict.npy', pathway_num_dict)
         return gene_dict, gene_num_dict, pathway_dict, pathway_num_dict
-
-
-
-
-def pre_parse():
-    dir_opt = '/datainfo1'
-    # # STABLE DICTIONARY NOT CHANGE WITH FILES
-    # ParseFile(dir_opt).drug_map()
-    # ParseFile(dir_opt).drug_map_dict()
-    # ParseFile(dir_opt).drug_target()
-    # ParseFile(dir_opt).cellline_map_dict()
-
-    RNA_seq_filename = 'nci60-ccle_RNAseq_tpm1'
-    # ParseFile(dir_opt).gene_target_num_dict(RNA_seq_filename)
-    # ParseFile(dir_opt).filter_cellline_gene(RNA_seq_filename)
-
-    pathway_filename = 'Selected_Kegg_Pathways1'
-    ParseFile(dir_opt).gene_pathway(pathway_filename)
     
 
-def pre_input():
-    dir_opt = '/datainfo1'
-    RNA_seq_filename = 'nci60-ccle_RNAseq_tpm1'
+def pre_manual():
+    dir_opt = '/datainfo2'
+    RNA_seq_filename = 'nci60-ccle_RNAseq_tpm2'
     ParseFile(dir_opt).input_condense()
+    ParseFile(dir_opt).drug_map()
+    # AFTER GET [/init_data/drug_map.csv] WITH AUTO MAP -> MANUAL MAP
+
+def pre_parse():
+    dir_opt = '/datainfo2'
+    # STABLE DICTIONARY NOT CHANGE WITH FILES
+    ParseFile(dir_opt).drug_map_dict()
+    ParseFile(dir_opt).drug_target()
+    ParseFile(dir_opt).cellline_map_dict()
+    ParseFile(dir_opt).cpnum_cellline_map_dict()
+    RNA_seq_filename = 'nci60-ccle_RNAseq_tpm2'
+    # ParseFile(dir_opt).filter_cellline_gene(RNA_seq_filename)
+    ParseFile(dir_opt).gene_target_num_dict(RNA_seq_filename)
+    pathway_filename = 'Selected_Kegg_Pathways2'
+    ParseFile(dir_opt).gene_pathway(pathway_filename)
+
+def pre_input():
+    dir_opt = '/datainfo2'
+    RNA_seq_filename = 'nci60-ccle_RNAseq_tpm2'
     ParseFile(dir_opt).input_drug_condense()
     ParseFile(dir_opt).input_cellline_condense(RNA_seq_filename)
     ParseFile(dir_opt).input_drug_gene_condense(RNA_seq_filename)
-    ParseFile(dir_opt).zero_final_drug_count()
+    # ParseFile(dir_opt).zero_final_drug_count()
 
-
-def split_train_test():
-    dir_opt = '/datainfo1'
-    test_size = 0.2
-    ParseFile(dir_opt).split_train_test(test_size)
+def k_fold_split(random_mode, k, place_num):
+    dir_opt = '/datainfo2'
+    if random_mode == True:
+        ParseFile(dir_opt).input_random_condense()
+    ParseFile(dir_opt).split_k_fold(k, place_num)
 
 
 if __name__ == "__main__":
+    pre_manual()
+    pre_parse()
+    pre_input()
 
-    # pre_parse()
-    # pre_input()
-    split_train_test()
-
-
-
-
-    
-    
+    # DOING K-FOLD VALIDATION IN 100% DATASET
+    random_mode = False
+    k = 5
+    place_num = 1
+    k_fold_split(random_mode, k, place_num)

@@ -7,9 +7,17 @@ import pandas as pd
 import keras.backend as K
 import matplotlib.pyplot as plt
 from load_data import LoadData
+from keras import Model
 from keras.models import Sequential
 from keras.models import load_model
-from keras.layers import Dense
+from keras.layers import Dense, Input, Dropout
+
+import innvestigate
+import tensorflow as tf
+
+from gen_matrix import GenMatrix
+from parse_file import ParseFile
+
 
 # BUILD A NOT FULLY CONNECTED NN
 class CustomConnected(Dense):
@@ -32,24 +40,36 @@ class RandNN():
     def __init__(self):
         pass
 
-    # NEW RAND NETWORK
-    def keras_rand_nn(self, matrixA, matrixB, num_gene, layer0, layer1, layer2, layer3):
-        # INITIALIZE THE CONSTRUCTOR
-        model = Sequential()
-        # ADD AN INPUT LAYER 
-        model.add(CustomConnected(num_gene, matrixA))
-        # ADD AN INPUT LAYER 
-        model.add(CustomConnected(layer0, matrixB))
-        # ADD ONE HIDDEN LAYER
-        model.add(Dense(layer1, activation='relu'))
-        # ADD ANOTHER HIDDEN LAYER 
-        model.add(Dense(layer2, activation='relu'))
-        # ADD ANOTHER HIDDEN LAYER 
-        model.add(Dense(layer3, activation='relu'))
-        # ADD FINAL OUTPUT LAYER 
-        # model.add(Dense(1, activation='sigmoid'))
-        model.add(Dense(1, activation='linear'))
-        return model
+    # DECOMPOSE NEURAL NETWORK
+    def keras_rand_nn(self, matrixA, matrixB, num_gene, num_pathway, layer1, layer2, layer3):
+        input_dim, num_gene = matrixA.shape
+        num_gene, num_pathway = matrixB.shape
+
+        input_x = Input(shape = (input_dim, ))
+        input_y = CustomConnected(num_gene, matrixA)(input_x)
+        input_model = Model(input_x, input_y)
+
+        gene_info = input_model(input_x)
+        gene_input = Input(shape = (num_gene, ))
+        pathway = CustomConnected(num_pathway, matrixB)(gene_input)
+        gene_model = Model(gene_input, pathway)
+
+        pathway_info = gene_model(gene_info)
+        pathway_input = Input(shape = (num_pathway, ))
+        # ADD DENSE LAYERS
+        output1 = Dense(layer1, activation='relu')(pathway_input)
+        # output1 = Dropout(0.01)(output1)
+        output2 = Dense(layer2, activation='relu')(output1)
+        # output2 = Dropout(0.01)(output2)
+        output3 = Dense(layer3, activation='relu')(output2)
+        # output3 = Dropout(0.01)(output3)
+        output4 = Dense(1, activation='linear')(output3)
+        pathway_model= Model(pathway_input, output4)
+
+        output4 = pathway_model(pathway_info)
+        model = Model(input_x, output4)
+
+        return input_model, gene_model, pathway_model, model
 
 
 class RunRandNN():
@@ -58,6 +78,7 @@ class RunRandNN():
         self.dir_opt = dir_opt
         self.RNA_seq_filename = RNA_seq_filename
 
+    # TRAIN DECOMPOSED DEEP NEURAL NETWORK
     def train(self, input_num, epoch, batch_size, verbose):
         model = self.model
         dir_opt = self.dir_opt
@@ -69,6 +90,8 @@ class RunRandNN():
         folder_name = 'epoch_' + str(epoch)
         path = '.' + dir_opt + '/result/%s' % (folder_name)
         unit = 1
+        if os.path.exists('.' + dir_opt + '/result') == False:
+            os.mkdir('.' + dir_opt + '/result')
         while os.path.exists(path):
             path = '.' + dir_opt + '/result/%s_%d' % (folder_name, unit)
             unit += 1
@@ -87,10 +110,11 @@ class RunRandNN():
                 else:
                     upper_index = input_num
                 xTr_batch, yTr_batch = LoadData(dir_opt, RNA_seq_filename).load_train(index, upper_index)
-                history = model.fit(xTr_batch, yTr_batch, epochs = 1, validation_split = 1, verbose = verbose)
+                history = model.fit(xTr_batch, yTr_batch, epochs = 1, verbose = verbose)
                 # PRESERVE MSE FOR EVERY BATCH
-                print(history.history['mse'], history.history['accuracy'])
-                batch_mse_list.append(history.history['mse'])
+                # print(history.history)
+                print('EPOCH MSE LOSS: ' + str(history.history['mean_squared_error'][0]))
+                batch_mse_list.append(history.history['mean_squared_error'])
                 # PRESERVE PREDICTION OF TRAINING MODEL IN EVERY BATCH
                 train_batch_pred = np.array(model.predict(xTr_batch))
                 epoch_train_pred = np.vstack((epoch_train_pred, train_batch_pred))
@@ -123,26 +147,23 @@ class RunRandNN():
         simplejson.dump(str(epoch_mse_list), fp)
         simplejson.dump(str(epoch_pearson_list), fp)
         fp.close()
+        # PRESERVE TRAINED DECOMPOSED MODEL
+        model.save_weights(path + '/model.h5')
         # PRESERVE TRAINED MODEL EACH LAYER WEIGHT PARAMETERS
-        layer_bias_list = []
-        layer_weight_list = []
+        layer_list = []
         num_layer = len(model.layers)
-        for i in num_layer:
-            layer_weight_list.append(model.get_layer(i).get_weights()[0])
-            layer_bias_list.append(model.get_layer(i).get_weights()[1])
-        with open(path + '/layer_bias_list.txt', 'wb') as filebias:
-            pickle.dump(layer_bias_list, filebias)
-        with open(path + '/layer_weight_list.txt', 'wb') as fileweight:
-            pickle.dump(layer_weight_list, fileweight)
-        return model, history, num_layer, path
+        for i in range(num_layer):
+            layer_list.append(model.get_layer(index = i).get_weights())
+        with open(path + '/layer_list.txt', 'wb') as filelayer:
+            pickle.dump(layer_list, filelayer)
+        return model, history, path
 
     def test(self, verbose, path):
-        print('TESTING DEEP NERUAL NETWORK...')
         model = self.model
         dir_opt = self.dir_opt
         RNA_seq_filename = self.RNA_seq_filename
         xTe, yTe = LoadData(dir_opt, RNA_seq_filename).load_test()
-        # TEST OUTPUT PRED
+        # TEST OUTPUT PRED 
         y_pred = model.predict(xTe)
         y_pred_list = [item for elem in y_pred for item in elem]
         score = model.evaluate(xTe, yTe, verbose = verbose)
@@ -152,25 +173,6 @@ class RunRandNN():
         final_test_input_df.to_csv(path + '/PredTestInput.txt', index = False, header = True)
         # ANALYSE PEARSON CORR
         test_pearson = final_test_input_df.corr(method = 'pearson')
+        print(score)
         print(test_pearson)
         return y_pred, score
-
-
-class RandNNPlot():
-    def __init__(self, history):
-        self.history = history
-
-    def plot(self, epoch, show_plot):
-        history = self.history
-        # plot training & validation accuracy values
-        plt.plot(history.history['accuracy'])
-        plt.plot(history.history['val_accuracy'])
-        plt.title('Model accuracy')
-        plt.ylabel('Accuracy')
-        plt.xlabel('Epoch')
-        plt.legend(['Train', 'Test'], loc = 'upper left')
-        if os.path.isdir("./img") == False: 
-                os.mkdir("./img")
-        plt.savefig("./img/RandNN-Accuracy" + str(epoch) + ".png")
-        if(show_plot == True):
-            plt.show()
